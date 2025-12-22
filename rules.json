@@ -1,0 +1,25 @@
+{
+  "routing_domain": {
+    "direct": [
+      "https://raw.githubusercontent.com/jackszb/self-rules/main/geosite-direct.srs",
+      "https://raw.githubusercontent.com/jackszb/premerge/main/wechat.srs",
+      "https://raw.githubusercontent.com/jackszb/premerge/main/CCTV.srs",
+      "https://raw.githubusercontent.com/jackszb/premerge/main/bilibili.srs",
+      "https://raw.githubusercontent.com/jackszb/premerge/main/DiDi.srs",
+      "https://raw.githubusercontent.com/jackszb/premerge/main/Alipay.srs",
+      "https://raw.githubusercontent.com/jackszb/premerge/main/12306.srs",
+      "https://raw.githubusercontent.com/jackszb/premerge/main/douyin.srs",
+      "https://raw.githubusercontent.com/jackszb/premerge/main/ChinaUnicom.srs"
+    ],
+    "proxy": [
+      "https://raw.githubusercontent.com/jackszb/self-rules/main/geosite-proxy.srs",
+      "https://raw.githubusercontent.com/jackszb/premerge/main/YouTube.srs",
+      "https://raw.githubusercontent.com/jackszb/premerge/main/github.srs",
+      "https://raw.githubusercontent.com/jackszb/premerge/main/openai.srs",
+      "https://raw.githubusercontent.com/jackszb/premerge/main/discord.srs",
+      "https://raw.githubusercontent.com/jackszb/premerge/main/tiktok.srs",
+      "https://raw.githubusercontent.com/jackszb/premerge/main/Spotify.srs",
+      "https://raw.githubusercontent.com/jackszb/premerge/main/Cloudflare.srs"
+    ]
+  }
+}
