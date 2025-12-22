@@ -1,0 +1,104 @@
+name: Update merged-ip-direct Rules
+
+on:
+  schedule:
+    - cron: '0 3 * * 1'   # 每周一 03:00（UTC）
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install sing-box
+        run: |
+          set -e
+          curl -fsSL https://sing-box.app/install.sh | sh
+          sing-box version
+
+      - name: Define and download rule sources
+        run: |
+          set -e
+
+          SOURCES=(
+            "https://raw.githubusercontent.com/lurixo/sing-box-rules/geoip/geoip-cn-ipv4.json"
+            "https://raw.githubusercontent.com/lurixo/sing-box-rules/geoip/geoip-cn-ipv6.json"
+          )
+
+          mkdir -p sources
+
+          i=0
+          for url in "${SOURCES[@]}"; do
+            i=$((i+1))
+            echo "Downloading source $i: $url"
+            curl -fsSL "$url" -o "sources/source_$i.json"
+          done
+
+      - name: Extract, merge, deduplicate IP CIDRs
+        run: |
+          set -e
+
+          jq -r '.rules[].ip_cidr[]?' sources/*.json \
+            | sed '/^$/d' \
+            > all_ip.txt
+
+          grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' all_ip.txt \
+            | sort -t. -k1,1n -k2,2n -k3,3n -k4,4n -u \
+            > ipv4_sorted.txt
+
+          grep ':' all_ip.txt \
+            | sort -u \
+            > ipv6_sorted.txt
+
+          cat ipv4_sorted.txt ipv6_sorted.txt > ip_list.txt
+
+      - name: Generate merged-ip-direct.json
+        run: |
+          set -e
+          mkdir -p rule-set
+          jq -R -s '
+            split("\n")
+            | map(select(length > 0))
+            | {
+                version: 3,
+                rules: [
+                  { ip_cidr: . }
+                ]
+              }
+          ' ip_list.txt > rule-set/merged-ip-direct.json
+
+      - name: Compile merged-ip-direct.srs
+        run: |
+          set -e
+          sing-box rule-set compile \
+            rule-set/merged-ip-direct.json \
+            --output rule-set/merged-ip-direct.srs
+
+      - name: Cleanup temporary files
+        run: |
+          rm -rf sources \
+            all_ip.txt \
+            ipv4_sorted.txt ipv6_sorted.txt \
+            ip_list.txt
+
+      - name: Commit and push changes
+        run: |
+          set -e
+
+          git config user.name "github-actions"
+          git config user.email "github-actions@github.com"
+
+          git add rule-set/merged-ip-direct.json rule-set/merged-ip-direct.srs
+
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "chore: update merged-ip-direct rules"
+            git push origin HEAD
+          fi
