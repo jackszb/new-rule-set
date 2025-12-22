@@ -1,0 +1,79 @@
+name: Update merged-domain-reject Rules
+
+on:
+  schedule:
+    - cron: "0 0 * * *"   # 每天 00:00 UTC 自动更新
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Download adblock list
+        run: |
+          curl -fsSL "https://raw.githubusercontent.com/jackszb/mullvad-to-adguard/main/adguard/all/adblock.txt" \
+            -o adblock.txt
+
+      - name: Extract domains (for domain_suffix)
+        run: |
+          set -e
+          mkdir -p tmp
+          grep '^||' adblock.txt \
+            | sed 's/^||//' \
+            | sed 's/\^$//' \
+            | sed '/^$/d' \
+            | sort -u \
+            > tmp/domain_list.txt
+
+      - name: Build merged-domain-reject.json
+        run: |
+          set -e
+          mkdir -p rule-set
+          jq -n --rawfile raw tmp/domain_list.txt '
+            {
+              version: 3,
+              rules: [
+                {
+                  domain_suffix: (
+                    $raw
+                    | split("\n")
+                    | map(select(length > 0))
+                  )
+                }
+              ]
+            }
+          ' > rule-set/merged-domain-reject.json
+
+      - name: Install sing-box (official script)
+        run: |
+          set -e
+          curl -fsSL https://sing-box.app/install.sh | sh
+
+      - name: Compile merged-domain-reject.srs
+        run: |
+          set -e
+          /usr/bin/sing-box rule-set compile \
+            rule-set/merged-domain-reject.json \
+            --output rule-set/merged-domain-reject.srs
+
+      - name: Commit and Push
+        run: |
+          set -e
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+
+          git add rule-set/merged-domain-reject.json rule-set/merged-domain-reject.srs
+
+          if git diff --cached --quiet; then
+            echo "No changes detected."
+          else
+            git commit -m "chore: update merged-domain-reject rules"
+            git push
+          fi
