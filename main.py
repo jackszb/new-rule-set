@@ -90,9 +90,10 @@ def process_category(url_list, output_prefix):
 
 
 if __name__ == "__main__":
-    # 清理旧文件
+    # 只删除当前脚本生成的 merged-* 文件
     for file in os.listdir(OUTPUT_DIR):
-        os.remove(os.path.join(OUTPUT_DIR, file))
+        if file.startswith("merged-"):
+            os.remove(os.path.join(OUTPUT_DIR, file))
 
     process_category(routing_domain.get("direct", []), "domain-direct")
     process_category(routing_domain.get("proxy", []), "domain-proxy")
