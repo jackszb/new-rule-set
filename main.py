@@ -4,6 +4,7 @@ import subprocess
 import json
 import tempfile
 import time
+import uuid
 
 OUTPUT_DIR = "rule-set"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -81,10 +82,10 @@ def process_category(url_list, output_prefix):
     merged_rules = merge_rules(all_rules)
     final_json = {"version": 3, "rules": [merged_rules]}
 
-    # 获取当前时间戳来确保唯一性
-    timestamp = int(time.time())
-    json_filename = f"merged-{output_prefix}-{timestamp}.json"
-    srs_filename = f"merged-{output_prefix}-{timestamp}.srs"
+    # 使用 UUID 保证文件名唯一
+    unique_id = str(uuid.uuid4())  # 使用唯一的 UUID
+    json_filename = f"merged-{output_prefix}-{unique_id}.json"
+    srs_filename = f"merged-{output_prefix}-{unique_id}.srs"
 
     json_path = os.path.join(OUTPUT_DIR, json_filename)
     srs_path = os.path.join(OUTPUT_DIR, srs_filename)
@@ -97,12 +98,7 @@ def process_category(url_list, output_prefix):
 
 
 if __name__ == "__main__":
-    # 只删除当前脚本生成的过期文件
-    # 可以根据时间戳进行删除，保证不会影响其他脚本生成的文件
-    for file in os.listdir(OUTPUT_DIR):
-        # 删除老的 merged 文件，保留新文件
-        if file.startswith("merged-"):
-            os.remove(os.path.join(OUTPUT_DIR, file))
-
+    # 不再删除任何文件，保证其他脚本生成的文件不会被误删
+    # 只清理临时文件或不必要的生成文件
     process_category(routing_domain.get("direct", []), "domain-direct")
     process_category(routing_domain.get("proxy", []), "domain-proxy")
