@@ -3,6 +3,7 @@ import requests
 import subprocess
 import json
 import tempfile
+import time
 
 OUTPUT_DIR = "rule-set"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -79,8 +80,14 @@ def process_category(url_list, output_prefix):
 
     merged_rules = merge_rules(all_rules)
     final_json = {"version": 3, "rules": [merged_rules]}
-    json_path = os.path.join(OUTPUT_DIR, f"merged-{output_prefix}.json")
-    srs_path = os.path.join(OUTPUT_DIR, f"merged-{output_prefix}.srs")
+
+    # 获取当前时间戳来确保唯一性
+    timestamp = int(time.time())
+    json_filename = f"merged-{output_prefix}-{timestamp}.json"
+    srs_filename = f"merged-{output_prefix}-{timestamp}.srs"
+
+    json_path = os.path.join(OUTPUT_DIR, json_filename)
+    srs_path = os.path.join(OUTPUT_DIR, srs_filename)
 
     with open(json_path, "w", encoding="utf-8") as f:
         json.dump(final_json, f, ensure_ascii=False, indent=2)
@@ -90,8 +97,10 @@ def process_category(url_list, output_prefix):
 
 
 if __name__ == "__main__":
-    # 只删除当前脚本生成的 merged-* 文件
+    # 只删除当前脚本生成的过期文件
+    # 可以根据时间戳进行删除，保证不会影响其他脚本生成的文件
     for file in os.listdir(OUTPUT_DIR):
+        # 删除老的 merged 文件，保留新文件
         if file.startswith("merged-"):
             os.remove(os.path.join(OUTPUT_DIR, file))
 
