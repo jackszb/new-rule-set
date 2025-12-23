@@ -47,6 +47,9 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
 
+          # 拉取远程分支的最新更改并进行 rebase，避免非快进合并
+          git pull --rebase origin main
+
           # 添加 rule-set/ 下的所有文件
           git add -A rule-set/
 
