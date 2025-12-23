@@ -3,8 +3,6 @@ import requests
 import subprocess
 import json
 import tempfile
-import time
-import uuid
 
 OUTPUT_DIR = "rule-set"
 os.makedirs(OUTPUT_DIR, exist_ok=True)
@@ -82,14 +80,20 @@ def process_category(url_list, output_prefix):
     merged_rules = merge_rules(all_rules)
     final_json = {"version": 3, "rules": [merged_rules]}
 
-    # 使用 UUID 保证文件名唯一
-    unique_id = str(uuid.uuid4())  # 使用唯一的 UUID
-    json_filename = f"merged-{output_prefix}-{unique_id}.json"
-    srs_filename = f"merged-{output_prefix}-{unique_id}.srs"
+    # 使用固定的文件名，不再使用 UUID
+    json_filename = f"merged-{output_prefix}.json"
+    srs_filename = f"merged-{output_prefix}.srs"
 
     json_path = os.path.join(OUTPUT_DIR, json_filename)
     srs_path = os.path.join(OUTPUT_DIR, srs_filename)
 
+    # 如果文件已存在，则删除旧文件，保留最新生成的文件
+    if os.path.exists(json_path):
+        os.remove(json_path)
+    if os.path.exists(srs_path):
+        os.remove(srs_path)
+
+    # 生成新的文件
     with open(json_path, "w", encoding="utf-8") as f:
         json.dump(final_json, f, ensure_ascii=False, indent=2)
 
@@ -98,7 +102,6 @@ def process_category(url_list, output_prefix):
 
 
 if __name__ == "__main__":
-    # 不再删除任何文件，保证其他脚本生成的文件不会被误删
-    # 只清理临时文件或不必要的生成文件
+    # 处理 direct 和 proxy 类别
     process_category(routing_domain.get("direct", []), "domain-direct")
     process_category(routing_domain.get("proxy", []), "domain-proxy")
