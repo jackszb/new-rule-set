@@ -15,6 +15,8 @@
     "proxy": [
       "https://raw.githubusercontent.com/jackszb/self-rules/main/geosite-proxy.srs",
       "https://raw.githubusercontent.com/jackszb/premerge/main/YouTube.srs",
+      "https://raw.githubusercontent.com/jackszb/premerge/main/netflix.srs",
+      "https://raw.githubusercontent.com/jackszb/premerge/main/instagram.srs",
       "https://raw.githubusercontent.com/jackszb/premerge/main/github.srs",
       "https://raw.githubusercontent.com/jackszb/premerge/main/openai.srs",
       "https://raw.githubusercontent.com/jackszb/premerge/main/discord.srs",
