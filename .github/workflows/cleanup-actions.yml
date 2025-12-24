@@ -1,0 +1,53 @@
+name: Cleanup old GitHub Actions runs
+
+on:
+  schedule:
+    - cron: "0 4 * * 0"   # 每周日 04:00
+  workflow_dispatch:
+
+permissions:
+  actions: write
+  contents: read
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Install GitHub CLI
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y gh
+
+      - name: Authenticate gh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh auth setup-git
+
+      - name: Delete old workflow runs
+        env:
+          GH_REPO: ${{ github.repository }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          # 保留最近 30 次，每个 workflow
+          KEEP=30
+
+          for wf in $(gh api repos/$GH_REPO/actions/workflows --jq '.workflows[].id'); do
+            echo "Processing workflow ID: $wf"
+
+            runs=$(gh api repos/$GH_REPO/actions/workflows/$wf/runs \
+              --paginate \
+              --jq '.workflow_runs[].id')
+
+            count=0
+            for run_id in $runs; do
+              count=$((count + 1))
+              if [ $count -le $KEEP ]; then
+                continue
+              fi
+
+              echo "Deleting run $run_id"
+              gh api repos/$GH_REPO/actions/runs/$run_id -X DELETE
+            done
+          done
