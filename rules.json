@@ -3,6 +3,7 @@
     "direct": [
       "https://raw.githubusercontent.com/jackszb/self-rules/main/geosite-direct.srs",
       "https://raw.githubusercontent.com/jackszb/premerge/main/wechat.srs",
+      "https://raw.githubusercontent.com/jackszb/premerge/main/weibo.srs",
       "https://raw.githubusercontent.com/jackszb/premerge/main/Apple_cdn.srs",
       "https://raw.githubusercontent.com/jackszb/premerge/main/CCTV.srs",
       "https://raw.githubusercontent.com/jackszb/premerge/main/bilibili.srs",
