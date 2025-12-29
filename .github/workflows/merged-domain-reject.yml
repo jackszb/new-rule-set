@@ -18,7 +18,7 @@ jobs:
 
       - name: Download adblock list
         run: |
-          curl -fsSL "https://raw.githubusercontent.com/jackszb/mullvad-to-adguard/main/adguard/categories/adblock/adblock.txt" \
+          curl -fsSL "https://raw.githubusercontent.com/cogwheel0/mullvad-to-adguard/main/adguard/categories/adblock/adblock.txt" \
             -o adblock.txt
 
       - name: Extract domains (for domain_suffix)
