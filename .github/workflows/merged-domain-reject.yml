@@ -1,0 +1,97 @@
+name: Update Mullvad DNSFilter
+
+on:
+  schedule:
+    - cron: "0 0 * * *"   # 每天 UTC 0 点自动运行
+  workflow_dispatch:       # 支持手动触发
+
+permissions:
+  contents: write
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1️⃣ 拉取仓库
+      - uses: actions/checkout@v4
+
+      # 2️⃣ 安装 sing-box
+      - name: Install sing-box
+        run: curl -fsSL https://sing-box.app/install.sh | sh
+
+      # 3️⃣ 安装 Python 依赖
+      - name: Install Python dependencies
+        run: pip install requests
+
+      # 4️⃣ 运行 Python 脚本生成 merged-domain-reject.json 和 merged-domain-reject.srs
+      - name: Generate Mullvad DNSFilter
+        run: |
+          python3 <<'EOF'
+          import json
+          import requests
+
+          # 下载纯域名列表
+          url = "https://raw.githubusercontent.com/mullvad/dns-blocklists/main/output/doh/doh_adblock.txt"
+          response = requests.get(url)
+          response.raise_for_status()
+
+          lines = response.text.splitlines()
+
+          domain = []        # 普通域名
+          domain_suffix = [] # 去掉通配符后的域名（加入 domain_suffix）
+
+          # 提取纯域名
+          for line in lines:
+              line = line.strip()
+              if not line or line.startswith("@@") or line.startswith("/"):
+                  continue
+              if '*' in line:
+                  # 去掉通配符和点，加入 domain_suffix
+                  domain_suffix.append(line.replace('*', '').replace('.', ''))
+              else:
+                  # 普通域名加入 domain
+                  domain.append(line)
+
+          # 去重排序
+          domain = sorted(set(domain))
+          domain_suffix = sorted(set(domain_suffix))
+
+          # 保存 txt 文件
+          with open('domain.txt', 'w') as f:
+              f.write('\n'.join(domain))
+          with open('domain_suffix.txt', 'w') as f:
+              f.write('\n'.join(domain_suffix))
+
+          # 生成最终 merged-domain-reject.json
+          merged_domain_reject_json = {
+              "version": 3,
+              "rules": [
+                  {
+                      "domain": domain,           # 保存普通域名
+                      "domain_suffix": domain_suffix  # 保存去掉通配符后的域名
+                  }
+              ]
+          }
+
+          # 保存 merged-domain-reject.json
+          with open('rule-set/merged-domain-reject.json', 'w') as f:
+              json.dump(merged_domain_reject_json, f, indent=2)
+
+          print("merged-domain-reject.json, domain_suffix.txt, and domain.txt generated successfully!")
+          EOF
+
+      # 5️⃣ 编译生成 merged-domain-reject.srs 文件
+      - name: Compile to merged-domain-reject.srs
+        run: sing-box rule-set compile rule-set/merged-domain-reject.json || echo "sing-box compile failed"
+
+      # 6️⃣ 提交并推送到仓库
+      - name: Commit & Push
+        run: |
+          git config user.name "GitHub Actions"
+          git config user.email "github-actions@github.com"
+          git add rule-set/merged-domain-reject.json rule-set/merged-domain-reject.srs
+          if ! git diff --cached --quiet; then
+            git commit -m "Update Mullvad DNSFilter"
+            git push
+          fi
