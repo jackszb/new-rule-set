@@ -24,7 +24,11 @@ jobs:
       - name: Install Python dependencies
         run: pip install requests
 
-      # 4️⃣ 运行 Python 脚本生成 merged-domain-reject.json 和 merged-domain-reject.srs
+      # 4️⃣ 安装 jq
+      - name: Install jq
+        run: sudo apt-get install jq
+
+      # 5️⃣ 运行 Python 脚本生成 merged-domain-reject.json 和 merged-domain-reject.srs
       - name: Generate Mullvad DNSFilter
         run: |
           python3 <<'EOF'
@@ -81,11 +85,11 @@ jobs:
           print("merged-domain-reject.json, domain_suffix.txt, and domain.txt generated successfully!")
           EOF
 
-      # 5️⃣ 编译生成 merged-domain-reject.srs 文件
+      # 6️⃣ 编译生成 merged-domain-reject.srs 文件
       - name: Compile to merged-domain-reject.srs
         run: sing-box rule-set compile rule-set/merged-domain-reject.json || echo "sing-box compile failed"
 
-      # 6️⃣ 提交并推送到仓库
+      # 7️⃣ 提交并推送到仓库
       - name: Commit & Push
         run: |
           git config user.name "GitHub Actions"
