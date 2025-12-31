@@ -27,8 +27,11 @@ jobs:
           set -e
 
           SOURCES=(
-            "https://raw.githubusercontent.com/lurixo/sing-box-rules/geoip/geoip-cn-ipv4.json"
-            "https://raw.githubusercontent.com/lurixo/sing-box-rules/geoip/geoip-cn-ipv6.json"
+            "https://raw.githubusercontent.com/Dreista/sing-box-rule-set-cn/rule-set/apnic-cn-ipv4.json"
+            "https://raw.githubusercontent.com/Dreista/sing-box-rule-set-cn/rule-set/apnic-cn-ipv6.json"
+            "https://raw.githubusercontent.com/Dreista/sing-box-rule-set-cn/rule-set/maxmind-cn-ipv4.json"
+            "https://raw.githubusercontent.com/Dreista/sing-box-rule-set-cn/rule-set/maxmind-cn-ipv6.json"
+            "https://raw.githubusercontent.com/Dreista/sing-box-rule-set-cn/rule-set/chnroutes.txt.json"
           )
 
           mkdir -p sources
