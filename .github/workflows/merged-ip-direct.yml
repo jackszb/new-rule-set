@@ -31,7 +31,7 @@ jobs:
             "https://raw.githubusercontent.com/Dreista/sing-box-rule-set-cn/rule-set/apnic-cn-ipv6.json"
             "https://raw.githubusercontent.com/Dreista/sing-box-rule-set-cn/rule-set/maxmind-cn-ipv4.json"
             "https://raw.githubusercontent.com/Dreista/sing-box-rule-set-cn/rule-set/maxmind-cn-ipv6.json"
-            "https://raw.githubusercontent.com/jackszb/premerge/rules/geoip-private.json"
+            "https://raw.githubusercontent.com/jackszb/premerge/main/rules/geoip-private.json"
           )
 
           mkdir -p sources
