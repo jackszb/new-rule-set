@@ -35,25 +35,12 @@ jobs:
           import json
           import requests
 
-          # 下载两个纯域名列表
-          url1 = "https://raw.githubusercontent.com/mullvad/dns-blocklists/main/output/doh/doh_adblock.txt"
-          url2 = "https://raw.githubusercontent.com/mullvad/dns-blocklists/main/output/relay/relay_adblock.txt"
-          
-          # 获取第一个文件
-          response1 = requests.get(url1)
-          response1.raise_for_status()
-          lines1 = response1.text.splitlines()
-          print(f"URL1 data: {len(lines1)} lines")  # 打印下载的行数
+          # 下载纯域名列表
+          url = "https://raw.githubusercontent.com/mullvad/dns-blocklists/main/output/doh/doh_adblock.txt"
+          response = requests.get(url)
+          response.raise_for_status()
 
-          # 获取第二个文件
-          response2 = requests.get(url2)
-          response2.raise_for_status()
-          lines2 = response2.text.splitlines()
-          print(f"URL2 data: {len(lines2)} lines")  # 打印下载的行数
-
-          # 合并两个列表
-          lines = lines1 + lines2
-          print(f"Total merged data: {len(lines)} lines")  # 打印合并后的总行数
+          lines = response.text.splitlines()
 
           domain = []        # 普通域名
           domain_suffix = [] # 去掉通配符后的域名（加入 domain_suffix）
@@ -73,9 +60,6 @@ jobs:
           # 去重排序
           domain = sorted(set(domain))
           domain_suffix = sorted(set(domain_suffix))
-
-          print(f"Unique domains: {len(domain)}")  # 打印去重后的域名数
-          print(f"Unique domain suffixes: {len(domain_suffix)}")  # 打印去重后的域名后缀数
 
           # 保存 txt 文件
           with open('domain.txt', 'w') as f:
