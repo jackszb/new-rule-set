@@ -25,29 +25,24 @@ jobs:
         run: |
           gh auth setup-git
 
-      - name: Delete old workflow runs
+      - name: Delete workflow runs older than 2 days
         env:
           GH_REPO: ${{ github.repository }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          # 保留最近 30 次，每个 workflow
-          KEEP=30
+          CUTOFF_TS=$(date -u -d "2 days ago" +"%Y-%m-%dT%H:%M:%SZ")
+          echo "Keeping workflow runs newer than: $CUTOFF_TS"
 
           for wf in $(gh api repos/$GH_REPO/actions/workflows --jq '.workflows[].id'); do
             echo "Processing workflow ID: $wf"
 
-            runs=$(gh api repos/$GH_REPO/actions/workflows/$wf/runs \
+            gh api repos/$GH_REPO/actions/workflows/$wf/runs \
               --paginate \
-              --jq '.workflow_runs[].id')
-
-            count=0
-            for run_id in $runs; do
-              count=$((count + 1))
-              if [ $count -le $KEEP ]; then
-                continue
+              --jq '.workflow_runs[] | "\(.id) \(.created_at)"' |
+            while read run_id created_at; do
+              if [[ "$created_at" < "$CUTOFF_TS" ]]; then
+                echo "Deleting run $run_id (created at $created_at)"
+                gh api repos/$GH_REPO/actions/runs/$run_id -X DELETE
               fi
-
-              echo "Deleting run $run_id"
-              gh api repos/$GH_REPO/actions/runs/$run_id -X DELETE
             done
           done
