@@ -1,12 +1,9 @@
-name: Update merged-ip-direct Rules
+name: Update geoip-direct (APNIC CN + built-in private IPs)
 
 on:
   schedule:
-    - cron: '0 3 * * 1'   # 每周一 03:00（UTC）
+    - cron: '0 0 * * *'
   workflow_dispatch:
-
-permissions:
-  contents: write
 
 jobs:
   update:
@@ -16,12 +13,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install sing-box
-        run: |
-          set -e
-          curl -fsSL https://sing-box.app/install.sh | sh
-          sing-box version
-
       - name: Setup Python
         uses: actions/setup-python@v5
         with:
@@ -29,107 +20,159 @@ jobs:
 
       - name: Install Python dependencies
         run: |
-          pip install netaddr
+          python -m pip install --upgrade pip
+          pip install requests netaddr
 
-      - name: Download rule sources
+      - name: Install sing-box
         run: |
-          set -e
-          mkdir -p sources
+          curl -fsSL https://sing-box.app/install.sh | sh
+          sing-box version
 
-          curl -fsSL \
-            https://raw.githubusercontent.com/Dreista/sing-box-rule-set-cn/rule-set/apnic-cn-ipv4.json \
-            -o sources/apnic-ipv4.json
-
-          curl -fsSL \
-            https://raw.githubusercontent.com/Dreista/sing-box-rule-set-cn/rule-set/apnic-cn-ipv6.json \
-            -o sources/apnic-ipv6.json
-
-          curl -fsSL \
-            https://raw.githubusercontent.com/Dreista/sing-box-rule-set-cn/rule-set/maxmind-cn-ipv4.json \
-            -o sources/maxmind-ipv4.json
-
-          curl -fsSL \
-            https://raw.githubusercontent.com/Dreista/sing-box-rule-set-cn/rule-set/maxmind-cn-ipv6.json \
-            -o sources/maxmind-ipv6.json
-
-          curl -fsSL \
-            https://raw.githubusercontent.com/jackszb/rules-build/main/rules-src/geoip-private.json \
-            -o sources/private.json
-
-      - name: Merge CIDRs and generate merged-ip-direct.json
+      - name: Generate geoip-direct rule-set
         run: |
           python << 'EOF'
+          import requests
+          import netaddr
           import json
+          import math
+          import subprocess
           import os
-          from netaddr import IPNetwork, cidr_merge
 
-          source_files = [
-              "sources/apnic-ipv4.json",
-              "sources/apnic-ipv6.json",
-              "sources/maxmind-ipv4.json",
-              "sources/maxmind-ipv6.json",
-              "sources/private.json",
+          APNIC_URL = "https://ftp.apnic.net/pub/stats/apnic/delegated-apnic-latest"
+
+          # ---------------------------
+          # 1. 内置 private IP（不参与 merge）
+          # ---------------------------
+          PRIVATE_IPV4 = [
+              "0.0.0.0/8",
+              "10.0.0.0/8",
+              "100.64.0.0/10",
+              "127.0.0.0/8",
+              "169.254.0.0/16",
+              "172.16.0.0/12",
+              "192.0.0.0/24",
+              "192.0.2.0/24",
+              "192.88.99.0/24",
+              "192.168.0.0/16",
+              "198.18.0.0/15",
+              "198.51.100.0/24",
+              "203.0.113.0/24",
+              "224.0.0.0/4",
+              "240.0.0.0/4",
           ]
 
-          ipv4 = []
-          ipv6 = []
-
-          for path in source_files:
-              with open(path, "r") as f:
-                  data = json.load(f)
-
-              for rule in data.get("rules", []):
-                  for cidr in rule.get("ip_cidr", []):
-                      net = IPNetwork(cidr)
-                      if net.version == 4:
-                          ipv4.append(net)
-                      else:
-                          ipv6.append(net)
-
-          ipv4_merged = cidr_merge(ipv4)
-          ipv6_merged = cidr_merge(ipv6)
-
-          all_cidrs = [str(n) for n in ipv4_merged + ipv6_merged]
+          PRIVATE_IPV6 = [
+              "::1/128",
+              "fc00::/7",
+              "fe80::/10",
+              "ff00::/8",
+          ]
 
           os.makedirs("rule-set", exist_ok=True)
 
-          out = {
-              "version": 3,
-              "rules": [
+          # ---------------------------
+          # 2. 解析 APNIC CN 公网 IP
+          # ---------------------------
+          ipv4 = []
+          ipv6 = []
+
+          resp = requests.get(APNIC_URL, timeout=60)
+          resp.raise_for_status()
+
+          for line in resp.text.splitlines():
+              if not line or line.startswith("#"):
+                  continue
+
+              fields = line.split("|")
+              if len(fields) < 7:
+                  continue
+
+              _, cc, rtype, start, value, *_ = fields
+              if cc != "CN":
+                  continue
+
+              try:
+                  if rtype == "ipv4":
+                      count = int(value)
+                      if count & (count - 1) != 0:
+                          continue
+                      prefix = 32 - int(math.log2(count))
+                      ipv4.append(netaddr.IPNetwork(f"{start}/{prefix}"))
+
+                  elif rtype == "ipv6":
+                      prefix = int(value)
+                      ipv6.append(netaddr.IPNetwork(f"{start}/{prefix}"))
+              except Exception:
+                  continue
+
+          # ---------------------------
+          # 3. 仅对公网 IP 做 merge
+          # ---------------------------
+          ipv4 = netaddr.cidr_merge(ipv4)
+          ipv6 = netaddr.cidr_merge(ipv6)
+
+          public_rules = [str(n) for n in ipv4 + ipv6]
+
+          # ---------------------------
+          # 4. private IP 直接追加（不 merge）
+          # ---------------------------
+          all_rules = set(public_rules)
+          all_rules.update(PRIVATE_IPV4)
+          all_rules.update(PRIVATE_IPV6)
+
+          all_rules = sorted(
+              all_rules,
+              key=lambda x: (
+                  netaddr.IPNetwork(x).version,
+                  int(netaddr.IPNetwork(x).network),
+              ),
+          )
+
+          output_json = "rule-set/merged-ip-direct.json"
+          output_srs  = "rule-set/merged-ip-direct.srs"
+
+          with open(output_json, "w") as f:
+              json.dump(
                   {
-                      "ip_cidr": all_cidrs
-                  }
-              ]
-          }
+                      "version": 3,
+                      "rules": [
+                          {"ip_cidr": all_rules}
+                      ]
+                  },
+                  f,
+                  indent=2
+              )
 
-          with open("rule-set/merged-ip-direct.json", "w") as f:
-              json.dump(out, f, indent=2)
+          subprocess.run(
+              [
+                  "sing-box",
+                  "rule-set",
+                  "compile",
+                  "--output",
+                  output_srs,
+                  output_json,
+              ],
+              check=True,
+          )
 
-          print(f"IPv4 CIDRs: {len(ipv4_merged)}")
-          print(f"IPv6 CIDRs: {len(ipv6_merged)}")
-          print(f"Total CIDRs: {len(all_cidrs)}")
+          print(f"Public IPv4 CIDR: {len(ipv4)}")
+          print(f"Public IPv6 CIDR: {len(ipv6)}")
+          print(f"Private IPv4 CIDR: {len(PRIVATE_IPV4)}")
+          print(f"Private IPv6 CIDR: {len(PRIVATE_IPV6)}")
+          print(f"Total CIDR: {len(all_rules)}")
           EOF
 
-      - name: Compile merged-ip-direct.srs
+      - name: Commit & Push
         run: |
-          sing-box rule-set compile \
-            rule-set/merged-ip-direct.json \
-            --output rule-set/merged-ip-direct.srs
-
-      - name: Cleanup
-        run: |
-          rm -rf sources
-
-      - name: Commit and push changes
-        run: |
-          git config user.name "github-actions"
-          git config user.email "github-actions@github.com"
+          git config --global user.email "github-actions@github.com"
+          git config --global user.name "GitHub Actions"
 
           git add rule-set/merged-ip-direct.json rule-set/merged-ip-direct.srs
 
           if git diff --cached --quiet; then
-            echo "No changes to commit."
-          else
-            git commit -m "chore: update merged-ip-direct rules"
-            git push origin HEAD
+            echo "No changes"
+            exit 0
           fi
+
+          git commit -m "Auto update merged-ip-direct (APNIC CN + private IPs)"
+          git push
