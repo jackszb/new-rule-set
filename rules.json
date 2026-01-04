@@ -1,9 +1,7 @@
 {
   "routing_domain": {
     "direct": [
-      "https://raw.githubusercontent.com/jackszb/rules-build/main/rules/geosite-direct.srs",
-      "https://raw.githubusercontent.com/jackszb/rules-build/main/rules/geosite-cn.srs",
-      "https://raw.githubusercontent.com/jackszb/rules-build/main/rules/geosite-private.srs",
+      "https://raw.githubusercontent.com/jackszb/simple/main/rule-set/geosite-direct.srs",
       "https://raw.githubusercontent.com/jackszb/rules-build/main/rules/12306.srs",
       "https://raw.githubusercontent.com/jackszb/rules-build/main/rules/alibaba.srs",
       "https://raw.githubusercontent.com/jackszb/rules-build/main/rules/alipay.srs",
