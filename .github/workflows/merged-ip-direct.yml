@@ -22,78 +22,106 @@ jobs:
           curl -fsSL https://sing-box.app/install.sh | sh
           sing-box version
 
-      - name: Define and download rule sources
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Python dependencies
+        run: |
+          pip install netaddr
+
+      - name: Download rule sources
         run: |
           set -e
-
-          SOURCES=(
-            "https://raw.githubusercontent.com/Dreista/sing-box-rule-set-cn/rule-set/apnic-cn-ipv4.json"
-            "https://raw.githubusercontent.com/Dreista/sing-box-rule-set-cn/rule-set/apnic-cn-ipv6.json"
-            "https://raw.githubusercontent.com/Dreista/sing-box-rule-set-cn/rule-set/maxmind-cn-ipv4.json"
-            "https://raw.githubusercontent.com/Dreista/sing-box-rule-set-cn/rule-set/maxmind-cn-ipv6.json"
-            "https://raw.githubusercontent.com/jackszb/rules-build/main/rules-src/geoip-private.json"
-          )
-
           mkdir -p sources
 
-          i=0
-          for url in "${SOURCES[@]}"; do
-            i=$((i+1))
-            echo "Downloading source $i: $url"
-            curl -fsSL "$url" -o "sources/source_$i.json"
-          done
+          curl -fsSL \
+            https://raw.githubusercontent.com/Dreista/sing-box-rule-set-cn/rule-set/apnic-cn-ipv4.json \
+            -o sources/apnic-ipv4.json
 
-      - name: Extract, merge, deduplicate IP CIDRs
+          curl -fsSL \
+            https://raw.githubusercontent.com/Dreista/sing-box-rule-set-cn/rule-set/apnic-cn-ipv6.json \
+            -o sources/apnic-ipv6.json
+
+          curl -fsSL \
+            https://raw.githubusercontent.com/Dreista/sing-box-rule-set-cn/rule-set/maxmind-cn-ipv4.json \
+            -o sources/maxmind-ipv4.json
+
+          curl -fsSL \
+            https://raw.githubusercontent.com/Dreista/sing-box-rule-set-cn/rule-set/maxmind-cn-ipv6.json \
+            -o sources/maxmind-ipv6.json
+
+          curl -fsSL \
+            https://raw.githubusercontent.com/jackszb/rules-build/main/rules-src/geoip-private.json \
+            -o sources/private.json
+
+      - name: Merge CIDRs and generate merged-ip-direct.json
         run: |
-          set -e
+          python << 'EOF'
+          import json
+          import os
+          from netaddr import IPNetwork, cidr_merge
 
-          jq -r '.rules[].ip_cidr[]?' sources/*.json \
-            | sed '/^$/d' \
-            > all_ip.txt
+          source_files = [
+              "sources/apnic-ipv4.json",
+              "sources/apnic-ipv6.json",
+              "sources/maxmind-ipv4.json",
+              "sources/maxmind-ipv6.json",
+              "sources/private.json",
+          ]
 
-          grep -E '^[0-9]+\.[0-9]+\.[0-9]+\.[0-9]+' all_ip.txt \
-            | sort -t. -k1,1n -k2,2n -k3,3n -k4,4n -u \
-            > ipv4_sorted.txt
+          ipv4 = []
+          ipv6 = []
 
-          grep ':' all_ip.txt \
-            | sort -u \
-            > ipv6_sorted.txt
+          for path in source_files:
+              with open(path, "r") as f:
+                  data = json.load(f)
 
-          cat ipv4_sorted.txt ipv6_sorted.txt > ip_list.txt
+              for rule in data.get("rules", []):
+                  for cidr in rule.get("ip_cidr", []):
+                      net = IPNetwork(cidr)
+                      if net.version == 4:
+                          ipv4.append(net)
+                      else:
+                          ipv6.append(net)
 
-      - name: Generate merged-ip-direct.json
-        run: |
-          set -e
-          mkdir -p rule-set
-          jq -R -s '
-            split("\n")
-            | map(select(length > 0))
-            | {
-                version: 3,
-                rules: [
-                  { ip_cidr: . }
-                ]
-              }
-          ' ip_list.txt > rule-set/merged-ip-direct.json
+          ipv4_merged = cidr_merge(ipv4)
+          ipv6_merged = cidr_merge(ipv6)
+
+          all_cidrs = [str(n) for n in ipv4_merged + ipv6_merged]
+
+          os.makedirs("rule-set", exist_ok=True)
+
+          out = {
+              "version": 3,
+              "rules": [
+                  {
+                      "ip_cidr": all_cidrs
+                  }
+              ]
+          }
+
+          with open("rule-set/merged-ip-direct.json", "w") as f:
+              json.dump(out, f, indent=2)
+
+          print(f"IPv4 CIDRs: {len(ipv4_merged)}")
+          print(f"IPv6 CIDRs: {len(ipv6_merged)}")
+          print(f"Total CIDRs: {len(all_cidrs)}")
+          EOF
 
       - name: Compile merged-ip-direct.srs
         run: |
-          set -e
           sing-box rule-set compile \
             rule-set/merged-ip-direct.json \
             --output rule-set/merged-ip-direct.srs
 
-      - name: Cleanup temporary files
+      - name: Cleanup
         run: |
-          rm -rf sources \
-            all_ip.txt \
-            ipv4_sorted.txt ipv6_sorted.txt \
-            ip_list.txt
+          rm -rf sources
 
       - name: Commit and push changes
         run: |
-          set -e
-
           git config user.name "github-actions"
           git config user.email "github-actions@github.com"
 
