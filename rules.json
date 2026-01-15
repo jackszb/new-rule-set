@@ -53,6 +53,7 @@
       "https://raw.githubusercontent.com/jackszb/rules-build/main/rules/gemini.srs",
       "https://raw.githubusercontent.com/jackszb/rules-build/main/rules/github.srs",
       "https://raw.githubusercontent.com/jackszb/rules-build/main/rules/google.srs",
+      "https://raw.githubusercontent.com/jackszb/rules-build/main/rules/googlefcm.srs",
       "https://raw.githubusercontent.com/jackszb/rules-build/main/rules/instagram.srs",
       "https://raw.githubusercontent.com/jackszb/rules-build/main/rules/line.srs",
       "https://raw.githubusercontent.com/jackszb/rules-build/main/rules/linkedin.srs",
